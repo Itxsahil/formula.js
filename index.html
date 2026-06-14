@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculate.js - Formula Sandbox</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #222; height: 100vh; display: flex; flex-direction: column; }
+
+  header { background: #1a73e8; color: #fff; padding: 8px 20px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .subtitle { opacity: 0.8; font-size: 13px; }
+
+  .tabs-main { display: flex; background: #fff; border-bottom: 1px solid #ddd; flex-shrink: 0; padding-left: 16px; }
+  .tab-main { padding: 8px 20px; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; color: #666; }
+  .tab-main.active { border-bottom-color: #1a73e8; color: #1a73e8; }
+  .tab-main:hover { background: #f0f4ff; }
+
+  .view { display: none; flex: 1; min-height: 0; }
+  .view.active { display: flex; }
+
+  /* ===== SAND ===== */
+  .sand-view { flex-direction: row; gap: 0; }
+  .sand-left { flex: 1; display: flex; flex-direction: column; padding: 12px 16px; overflow-y: auto; gap: 8px; }
+  .sand-right { width: 380px; border-left: 1px solid #ddd; background: #fff; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; }
+  .sand-right .tabs { display: flex; border-bottom: 1px solid #ddd; background: #fafafa; }
+  .sand-right .tab { padding: 6px 16px; font-size: 12px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; color: #666; }
+  .sand-right .tab.active { border-bottom-color: #1a73e8; color: #1a73e8; }
+  .sand-right .tab-content { display: none; flex: 1; overflow: auto; padding: 8px 12px; }
+  .sand-right .tab-content.active { display: block; }
+
+  .formula-input-wrap { position: relative; }
+  .formula-input-wrap .prefix { position: absolute; left: 10px; top: 10px; font-size: 16px; font-weight: 700; color: #1a73e8; font-family: monospace; pointer-events: none; }
+  #sand-formula { width: 100%; padding: 10px 10px 10px 30px; font-size: 16px; font-family: monospace; border: 2px solid #ccc; border-radius: 6px; outline: none; resize: vertical; min-height: 44px; }
+  #sand-formula:focus { border-color: #1a73e8; }
+
+  .result-row { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+  #sand-result { font-size: 24px; font-weight: 700; font-family: monospace; padding: 4px 12px; background: #e8f5e9; border-radius: 6px; }
+  #sand-result.error { background: #ffebee; color: #c62828; font-size: 14px; }
+  .result-label { font-size: 12px; color: #888; }
+
+  .cell-data-editor { border: 1px solid #ddd; border-radius: 6px; overflow: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .cell-data-editor .header { display: flex; background: #f8f9fa; border-bottom: 1px solid #ddd; font-size: 12px; font-weight: 600; }
+  .cell-data-editor .header > * { padding: 6px 10px; }
+  .cell-data-editor .header .ref-col { width: 60px; text-align: center; border-right: 1px solid #ddd; }
+  .cell-data-editor .header .val-col { flex: 1; }
+  .cell-data-editor .header .del-col { width: 36px; text-align: center; }
+  .cd-rows { overflow-y: auto; flex: 1; }
+  .cd-row { display: flex; border-bottom: 1px solid #f0f0f0; align-items: center; }
+  .cd-row:hover { background: #f8f9fa; }
+  .cd-row .ref-col { width: 60px; text-align: center; font-family: monospace; font-size: 12px; font-weight: 600; color: #1a73e8; border-right: 1px solid #f0f0f0; padding: 4px 0; }
+  .cd-row .val-col { flex: 1; }
+  .cd-row .val-col input { width: 100%; border: none; padding: 4px 8px; font-size: 13px; font-family: monospace; outline: none; background: transparent; }
+  .cd-row .val-col input:focus { background: #e8f0fe; }
+  .cd-row .del-col { width: 36px; text-align: center; cursor: pointer; color: #ccc; font-size: 16px; }
+  .cd-row .del-col:hover { color: #c62828; }
+  .cd-add-row { display: flex; }
+  .cd-add-row input { width: 60px; border: none; padding: 4px 8px; font-size: 12px; font-family: monospace; border-right: 1px solid #f0f0f0; outline: none; }
+  .cd-add-row input:focus { background: #e8f0fe; }
+  .cd-add-row .add-btn { flex: 1; padding: 4px; border: none; background: #f0f0f0; cursor: pointer; font-size: 12px; color: #666; }
+  .cd-add-row .add-btn:hover { background: #e3f2fd; color: #1a73e8; }
+
+  /* ===== GRID ===== */
+  .grid-view { flex-direction: column; }
+  .grid-container { flex: 1; overflow: auto; }
+  .grid-top-bar { display: flex; align-items: center; gap: 8px; padding: 6px 16px; background: #fff; border-bottom: 1px solid #ddd; flex-shrink: 0; }
+  #g-cell-ref { width: 60px; padding: 4px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; background: #f0f0f0; text-align: center; }
+  #g-formula { flex: 1; padding: 4px 8px; font-size: 13px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; outline: none; }
+  #g-formula:focus { border-color: #1a73e8; }
+  #g-result { font-size: 13px; padding: 4px 12px; background: #e8f5e9; border-radius: 4px; min-width: 60px; text-align: center; font-weight: 600; }
+  #g-result.error { background: #ffebee; color: #c62828; }
+
+  table { border-collapse: collapse; width: max-content; min-width: 100%; }
+  th, td { border: 1px solid #ccc; padding: 4px 8px; font-size: 13px; text-align: right; min-width: 80px; height: 28px; }
+  th { background: #f8f9fa; font-weight: 500; text-align: center; position: sticky; top: 0; z-index: 2; border-bottom: 2px solid #ccc; }
+  th:first-child { left: 0; z-index: 3; background: #eee; min-width: 36px; }
+  td:first-child { background: #f8f9fa; font-weight: 500; text-align: center; position: sticky; left: 0; z-index: 1; min-width: 36px; }
+  td { cursor: pointer; background: #fff; }
+  td.selected { outline: 2px solid #1a73e8; outline-offset: -2px; background: #e8f0fe; }
+  td.formula-cell { color: #1a73e8; }
+  td.error-cell { color: #c62828; }
+  td:hover { background: #f0f6ff; }
+
+  /* ===== AST ===== */
+  .ast-tree { font-family: monospace; font-size: 12px; line-height: 1.6; }
+  .ast-node { padding-left: 16px; border-left: 1px solid #ddd; margin: 1px 0; }
+  .ast-leaf { color: #1a73e8; }
+  .ast-func { color: #e65100; font-weight: 600; }
+  .ast-op { color: #6a1b9a; font-weight: 600; }
+  .ast-label { color: #888; font-size: 10px; }
+
+  /* ===== BUILDER ===== */
+  .fn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .fn-card { padding: 6px 8px; border-radius: 4px; background: #f5f5f5; cursor: pointer; border: 1px solid transparent; }
+  .fn-card:hover { background: #e3f2fd; border-color: #90caf9; }
+  .fn-card .fn-name { font-weight: 600; font-family: monospace; font-size: 13px; color: #1a73e8; }
+  .fn-card .fn-sig { font-size: 11px; color: #888; font-family: monospace; }
+  .fn-card .fn-desc { font-size: 11px; color: #555; }
+
+  .builder-bar { display: flex; gap: 6px; padding: 6px 0; flex-wrap: wrap; }
+  .builder-bar button { padding: 4px 10px; font-size: 11px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; font-family: monospace; }
+  .builder-bar button:hover { background: #e3f2fd; border-color: #90caf9; }
+  .fn-search { width: 100%; padding: 6px 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 6px; outline: none; font-family: monospace; }
+  .fn-search:focus { border-color: #1a73e8; }
+
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 600; margin-left: 4px; }
+  .badge-math { background: #e3f2fd; color: #1565c0; }
+  .badge-text { background: #fce4ec; color: #c62828; }
+  .badge-logic { background: #e8f5e9; color: #2e7d32; }
+  .badge-stats { background: #fff3e0; color: #e65100; }
+
+  .inline-notice { background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px; padding: 6px 10px; font-size: 12px; color: #f57f17; margin-bottom: 6px; }
+
+  @media(max-width:800px){
+    .sand-view { flex-direction: column; }
+    .sand-right { width: 100%; border-left: none; border-top: 1px solid #ddd; max-height: 40%; }
+    .fn-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧮 Calculate.js</h1>
+  <span class="subtitle">Formula engine — sandbox, grid &amp; builder</span>
+</header>
+
+<div class="tabs-main">
+  <div class="tab-main active" data-view="sand">🧪 Sandbox</div>
+  <div class="tab-main" data-view="grid">📊 Grid</div>
+</div>
+
+<!-- ===== SAND ===== -->
+<div class="view sand-view active" id="view-sand">
+  <div class="sand-left">
+    <div class="formula-input-wrap">
+      <span class="prefix">=</span>
+      <textarea id="sand-formula" rows="1" placeholder="SUM(A1:A5) / COUNT(A1:A5) * 100"></textarea>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Result:</span>
+      <span id="sand-result">—</span>
+    </div>
+    <div class="cell-data-editor">
+      <div class="header">
+        <span class="ref-col">Ref</span>
+        <span class="val-col">Value</span>
+        <span class="del-col">✕</span>
+      </div>
+      <div class="cd-rows" id="cd-rows"></div>
+      <div class="cd-add-row">
+        <input id="cd-new-ref" type="text" placeholder="A10" style="width:60px;">
+        <input id="cd-new-val" type="text" placeholder="value" style="flex:1;border:none;padding:4px 8px;font-size:12px;font-family:monospace;outline:none;">
+        <button class="add-btn" id="cd-add-btn">+ Add cell</button>
+      </div>
+    </div>
+  </div>
+  <div class="sand-right">
+    <div class="tabs">
+      <div class="tab active" data-tab="ast">AST</div>
+      <div class="tab" data-tab="data">Cell Data</div>
+      <div class="tab" data-tab="builder">Builder</div>
+    </div>
+    <div class="tab-content active" id="tab-ast"><div id="ast-output" style="color:#999;font-style:italic">Type a formula to see its AST</div></div>
+    <div class="tab-content" id="tab-data"><pre id="data-output" style="font-family:monospace;font-size:12px;"></pre></div>
+    <div class="tab-content" id="tab-builder">
+      <input class="fn-search" id="fn-search" type="text" placeholder="Filter functions..." autocomplete="off">
+      <div class="fn-grid" id="fn-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GRID ===== -->
+<div class="view grid-view" id="view-grid">
+  <div class="grid-top-bar">
+    <span id="g-cell-ref">A1</span>
+    <input id="g-formula" type="text" placeholder="Value or =formula" spellcheck="false">
+    <span>→</span>
+    <span id="g-result"></span>
+  </div>
+  <div class="grid-container"><table id="grid"></table></div>
+</div>
+
+<script>
+// ===== FORMULA ENGINE (lexer, parser, evaluator) =====
+const TT = {
+  NUMBER:'NUMBER',STRING:'STRING',IDENTIFIER:'IDENTIFIER',CELL_REF:'CELL_REF',
+  LPAREN:'LPAREN',RPAREN:'RPAREN',COMMA:'COMMA',
+  PLUS:'PLUS',MINUS:'MINUS',STAR:'STAR',SLASH:'SLASH',
+  EQ:'EQ',NEQ:'NEQ',GT:'GT',LT:'LT',GTE:'GTE',LTE:'LTE',
+  COLON:'COLON',AMPERSAND:'AMPERSAND',EOF:'EOF'
+}
+
+function tokenize(inp) {
+  const tks=[]; let i=0
+  const n=i=>/[0-9.]/.test(i), w=i=>/[A-Za-z_]/.test(i)
+  while(i<inp.length){
+    const c=inp[i]
+    if(c===' '||c==='\t'||c==='\n'){i++;continue}
+    if(c==='('){tks.push({t:TT.LPAREN});i++;continue}
+    if(c===')'){tks.push({t:TT.RPAREN});i++;continue}
+    if(c===','){tks.push({t:TT.COMMA});i++;continue}
+    if(c==='+'){tks.push({t:TT.PLUS});i++;continue}
+    if(c==='*'){tks.push({t:TT.STAR});i++;continue}
+    if(c==='/'){tks.push({t:TT.SLASH});i++;continue}
+    if(c===':'){tks.push({t:TT.COLON});i++;continue}
+    if(c==='&'){tks.push({t:TT.AMPERSAND});i++;continue}
+    if(c==='='&&inp[i+1]==='='){tks.push({t:TT.EQ});i+=2;continue}
+    if(c==='!'&&inp[i+1]==='='){tks.push({t:TT.NEQ});i+=2;continue}
+    if(c==='>'&&inp[i+1]==='='){tks.push({t:TT.GTE});i+=2;continue}
+    if(c==='<'&&inp[i+1]==='='){tks.push({t:TT.LTE});i+=2;continue}
+    if(c==='>'){tks.push({t:TT.GT});i++;continue}
+    if(c==='<'){tks.push({t:TT.LT});i++;continue}
+    if(c==='-'){
+      if(tks.length===0||[TT.NUMBER,TT.RPAREN,TT.CELL_REF].indexOf(tks[tks.length-1].t)===-1){
+        let j=i;while(j<inp.length&&n(inp[j]))j++;if(j>i){tks.push({t:TT.NUMBER,v:parseFloat(inp.slice(i,j))});i=j;continue}
+      }
+      tks.push({t:TT.MINUS});i++;continue
+    }
+    if(n(c)){let j=i;while(j<inp.length&&n(inp[j]))j++;tks.push({t:TT.NUMBER,v:parseFloat(inp.slice(i,j))});i=j;continue}
+    if(c==='"'||c==="'"){const q=c;let j=i+1;while(j<inp.length&&inp[j]!==q)j++;if(j>=inp.length)throw new Error('Unterminated string');tks.push({t:TT.STRING,v:inp.slice(i+1,j)});i=j+1;continue}
+    if(w(c)){let j=i;while(j<inp.length&&w(inp[j]))j++;const s=inp.slice(i,j);tks.push(/^[A-Za-z]+\d+$/.test(s)?{t:TT.CELL_REF,v:s.toUpperCase()}:{t:TT.IDENTIFIER,v:s.toUpperCase()});i=j;continue}
+    throw new Error(`Unexpected '${c}' at ${i}`)
+  }
+  tks.push({t:TT.EOF});return tks
+}
+
+class N{constructor(t,...a){this.t=t;Object.assign(this,...a)}}
+
+class P{
+  constructor(t){this.t=t;this.p=0}
+  peek(){return this.t[this.p]}
+  con(){return this.t[this.p++]}
+  exp(t){const r=this.con();if(r.t!==t)throw new Error(`Expected ${t}, got ${r.t}`);return r}
+  parse(){return this.cmp()}
+  cmp(){
+    let l=this.as()
+    while([TT.EQ,TT.NEQ,TT.GT,TT.LT,TT.GTE,TT.LTE].indexOf(this.peek().t)!==-1){const o=this.con().t,r=this.as();l=new N('BinaryOp',{o,l,r})}
+    return l
+  }
+  as(){
+    let l=this.ads()
+    while(this.peek().t===TT.AMPERSAND){const o=this.con().t,r=this.ads();l=new N('BinaryOp',{o,l,r})}
+    return l
+  }
+  ads(){
+    let l=this.mds()
+    while(this.peek().t===TT.PLUS||this.peek().t===TT.MINUS){const o=this.con().t,r=this.mds();l=new N('BinaryOp',{o,l,r})}
+    return l
+  }
+  mds(){
+    let l=this.un()
+    while(this.peek().t===TT.STAR||this.peek().t===TT.SLASH){const o=this.con().t,r=this.un();l=new N('BinaryOp',{o,l,r})}
+    return l
+  }
+  un(){
+    if(this.peek().t===TT.MINUS){this.con();return new N('UnaryOp',{o:TT.MINUS,opd:this.un()})}
+    if(this.peek().t===TT.PLUS){this.con();return this.un()}
+    return this.pr()
+  }
+  pr(){
+    const t=this.peek()
+    if(t.t===TT.NUMBER){this.con();return new N('Number',{v:t.v})}
+    if(t.t===TT.STRING){this.con();return new N('String',{v:t.v})}
+    if(t.t===TT.CELL_REF){
+      this.con()
+      if(this.peek().t===TT.COLON){this.con();const e=this.exp(TT.CELL_REF).v;return new N('CellRange',{s:t.v,e})}
+      return new N('CellRef',{r:t.v})
+    }
+    if(t.t===TT.IDENTIFIER){
+      this.con();this.exp(TT.LPAREN);const a=[]
+      if(this.peek().t!==TT.RPAREN){a.push(this.cmp());while(this.peek().t===TT.COMMA){this.con();a.push(this.cmp())}}
+      this.exp(TT.RPAREN);return new N('FunctionCall',{n:t.v,a})
+    }
+    if(t.t===TT.LPAREN){this.con();const e=this.cmp();this.exp(TT.RPAREN);return e}
+    throw new Error(`Unexpected: ${t.t}`)
+  }
+}
+
+function evalNode(node,data){
+  const en=n=>evalNode(n,data)
+  switch(node.t){
+    case'Number':return node.v
+    case'String':return node.v
+    case'CellRef':{
+      const v=data[node.r]
+      if(v===undefined||v===null)return 0
+      if(typeof v==='number')return v
+      if(typeof v==='string'){const n=parseFloat(v);return isNaN(n)?v:n}
+      return v
+    }
+    case'CellRange':{
+      const{s:start,e:end}=node
+      const sc=start.match(/[A-Z]+/)[0],sr=parseInt(start.match(/\d+/)[0],10)
+      const ec=end.match(/[A-Z]+/)[0],er=parseInt(end.match(/\d+/)[0],10)
+      const c2n=c=>c.split('').reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0)
+      const n2c=n=>{let s='';while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26)}return s}
+      const scn=c2n(sc),ecn=c2n(ec),r1=Math.min(sr,er),r2=Math.max(sr,er)
+      const vals=[]
+      for(let r=r1;r<=r2;r++)for(let c=Math.min(scn,ecn);c<=Math.max(scn,ecn);c++)vals.push(en(new N('CellRef',{r:n2c(c)+r})))
+      return vals
+    }
+    case'UnaryOp':{const v=en(node.opd);return node.o===TT.MINUS?-v:v}
+    case'BinaryOp':{
+      const l=en(node.l),r=en(node.r)
+      switch(node.o){
+        case TT.PLUS:return l+r;case TT.MINUS:return l-r;case TT.STAR:return l*r;case TT.SLASH:return l/r
+        case TT.AMPERSAND:return String(l)+String(r)
+        case TT.EQ:return l===r?1:0;case TT.NEQ:return l!==r?1:0;case TT.GT:return l>r?1:0
+        case TT.LT:return l<r?1:0;case TT.GTE:return l>=r?1:0;case TT.LTE:return l<=r?1:0
+        default:throw new Error(`Unknown op: ${node.o}`)
+      }
+    }
+    case'FunctionCall':{
+      const args=node.a.map(en),fn=FN[node.n]
+      if(!fn)throw new Error(`Unknown fn: ${node.n}`)
+      return fn(...args)
+    }
+    default:throw new Error(`Unknown node: ${node.t}`)
+  }
+}
+
+const FN={
+  SUM:(...a)=>a.flat(Infinity).reduce((a,b)=>a+(typeof b==='number'?b:0),0),
+  SUB:(a,b)=>a-b,
+  MUL:(...a)=>a.flat(Infinity).reduce((a,b)=>a*(typeof b==='number'?b:1),1),
+  DIV:(a,b)=>a/b,
+  AVG:(...a)=>{const f=a.flat(Infinity).filter(v=>typeof v==='number');return f.length?FN.SUM(...f)/f.length:0},
+  MIN:(...a)=>Math.min(...a.flat(Infinity).filter(v=>typeof v==='number')),
+  MAX:(...a)=>Math.max(...a.flat(Infinity).filter(v=>typeof v==='number')),
+  COUNT:(...a)=>a.flat(Infinity).filter(v=>typeof v==='number'&&!isNaN(v)).length,
+  ABS:x=>Math.abs(x),
+  ROUND:(x,d)=>Math.round(x*10**(d||0))/10**(d||0),
+  IF:(c,t,f)=>c?t:f,
+  CONCAT:(...a)=>a.flat(Infinity).join(''),
+  UPPER:s=>String(s).toUpperCase(),
+  LOWER:s=>String(s).toLowerCase(),
+  LEN:s=>String(s).length,
+  TRIM:s=>String(s).trim(),
+  PI:()=>Math.PI,
+  POWER:(b,e)=>Math.pow(b,e),
+  SQRT:x=>Math.sqrt(x),
+  MOD:(a,b)=>a%b,
+  INT:x=>Math.floor(x),
+}
+
+function compile(f){return new P(tokenize(f)).parse()}
+function run(f,data={}){return evalNode(compile(f),data)}
+
+// ===== FN META for builder =====
+const FN_META = [
+  {name:'SUM',sig:'n1, n2, ...',desc:'Sum of numbers',cat:'math'},
+  {name:'SUB',sig:'a, b',desc:'a minus b',cat:'math'},
+  {name:'MUL',sig:'n1, n2, ...',desc:'Product of numbers',cat:'math'},
+  {name:'DIV',sig:'a, b',desc:'a divided by b',cat:'math'},
+  {name:'AVG',sig:'n1, n2, ...',desc:'Average',cat:'stats'},
+  {name:'MIN',sig:'n1, n2, ...',desc:'Minimum value',cat:'stats'},
+  {name:'MAX',sig:'n1, n2, ...',desc:'Maximum value',cat:'stats'},
+  {name:'COUNT',sig:'v1, v2, ...',desc:'Count of numbers',cat:'stats'},
+  {name:'ABS',sig:'x',desc:'Absolute value',cat:'math'},
+  {name:'ROUND',sig:'x, [digits]',desc:'Round to N digits',cat:'math'},
+  {name:'INT',sig:'x',desc:'Floor to integer',cat:'math'},
+  {name:'POWER',sig:'base, exp',desc:'Raise to power',cat:'math'},
+  {name:'SQRT',sig:'x',desc:'Square root',cat:'math'},
+  {name:'MOD',sig:'a, b',desc:'Remainder of a/b',cat:'math'},
+  {name:'PI',sig:'()',desc:'π (3.14159)',cat:'math'},
+  {name:'IF',sig:'cond, t, f',desc:'Conditional',cat:'logic'},
+  {name:'CONCAT',sig:'s1, s2, ...',desc:'Join strings',cat:'text'},
+  {name:'UPPER',sig:'s',desc:'To uppercase',cat:'text'},
+  {name:'LOWER',sig:'s',desc:'To lowercase',cat:'text'},
+  {name:'TRIM',sig:'s',desc:'Trim whitespace',cat:'text'},
+  {name:'LEN',sig:'s',desc:'String length',cat:'text'},
+]
+
+// ===== SANDBOX UI =====
+const sf = document.getElementById('sand-formula')
+const sr = document.getElementById('sand-result')
+const cdRows = document.getElementById('cd-rows')
+
+let sandData = {A1:10,A2:20,A3:30,A4:40,A5:50,B1:5,B2:15,C1:'hello',C2:'world'}
+let cdRefs = Object.keys(sandData)
+
+function renderCD() {
+  cdRows.innerHTML = cdRefs.map(ref => {
+    const v = sandData[ref] !== undefined ? String(sandData[ref]) : ''
+    return `<div class="cd-row">
+      <span class="ref-col">${ref}</span>
+      <span class="val-col"><input class="cd-val" data-ref="${ref}" type="text" value="${esc(v)}" spellcheck="false"></span>
+      <span class="del-col" data-del="${ref}">✕</span>
+    </div>`
+  }).join('')
+
+  document.querySelectorAll('.cd-val').forEach(inp => {
+    inp.addEventListener('input', () => {
+      sandData[inp.dataset.ref] = inp.value
+      evaluateSand()
+    })
+  })
+  document.querySelectorAll('[data-del]').forEach(el => {
+    el.addEventListener('click', () => {
+      const ref = el.dataset.del
+      delete sandData[ref]
+      cdRefs = cdRefs.filter(r => r !== ref)
+      renderCD()
+      evaluateSand()
+    })
+  })
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+document.getElementById('cd-add-btn').addEventListener('click', () => {
+  const ref = document.getElementById('cd-new-ref').value.trim().toUpperCase()
+  const val = document.getElementById('cd-new-val').value.trim()
+  if (!ref || !/^[A-Z]+\d+$/.test(ref)) return
+  sandData[ref] = val
+  if (!cdRefs.includes(ref)) cdRefs.push(ref)
+  document.getElementById('cd-new-ref').value = ''
+  document.getElementById('cd-new-val').value = ''
+  renderCD()
+  evaluateSand()
+})
+
+document.getElementById('cd-new-ref').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('cd-new-val').focus() })
+document.getElementById('cd-new-val').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('cd-add-btn').click() })
+
+function evaluateSand() {
+  const formula = sf.value.trim()
+  if (!formula) { sr.textContent = '—'; sr.className = ''; renderAST(null); renderDataTab(); return }
+  try {
+    const data = {}
+    for (const ref of cdRefs) {
+      if (sandData[ref] !== undefined) {
+        const v = sandData[ref]
+        const n = parseFloat(v)
+        data[ref] = isNaN(n) || v === '' ? v : n
+      }
+    }
+    const result = run(formula, data)
+    const display = typeof result === 'number' && !Number.isInteger(result) ? result.toFixed(6) : String(result)
+    sr.textContent = display
+    sr.className = ''
+    renderAST(compile(formula))
+  } catch(e) {
+    sr.textContent = e.message
+    sr.className = 'error'
+    renderAST(null, e.message)
+  }
+  renderDataTab()
+}
+
+function renderAST(ast, error) {
+  const out = document.getElementById('ast-output')
+  if (error) { out.innerHTML = `<div style="color:#c62828">${esc(error)}</div>`; return }
+  if (!ast) { out.innerHTML = '<div style="color:#999;font-style:italic">Type a formula to see its AST</div>'; return }
+  out.innerHTML = '<div class="ast-tree">' + renderASTNode(ast) + '</div>'
+}
+
+function renderASTNode(node, d=0) {
+  const i = '&nbsp;'.repeat(d*2)
+  switch(node.t) {
+    case'Number': return `<div class="ast-node"><span class="ast-label">${i}Number:</span> <span class="ast-leaf">${node.v}</span></div>`
+    case'String': return `<div class="ast-node"><span class="ast-label">${i}String:</span> <span class="ast-leaf">"${esc(node.v)}"</span></div>`
+    case'CellRef': return `<div class="ast-node"><span class="ast-label">${i}CellRef:</span> <span class="ast-leaf">${node.r}</span></div>`
+    case'CellRange': return `<div class="ast-node"><span class="ast-label">${i}CellRange:</span> <span class="ast-leaf">${node.s}:${node.e}</span></div>`
+    case'UnaryOp': return `<div class="ast-node"><span class="ast-label">${i}UnaryOp:</span> <span class="ast-op">-</span>${renderASTNode(node.opd,d+1)}</div>`
+    case'BinaryOp':{
+      const m={PLUS:'+',MINUS:'-',STAR:'*',SLASH:'/',AMPERSAND:'&',EQ:'==',NEQ:'!=',GT:'>',LT:'<',GTE:'>=',LTE:'<='}
+      return `<div class="ast-node"><span class="ast-label">${i}BinaryOp:</span> <span class="ast-op">${m[node.o]||node.o}</span>${renderASTNode(node.l,d+1)}${renderASTNode(node.r,d+1)}</div>`
+    }
+    case'FunctionCall':{
+      let h=`<div class="ast-node"><span class="ast-label">${i}Function:</span> <span class="ast-func">${node.n}</span>`
+      for(const a of node.a) h+=renderASTNode(a,d+1)
+      return h+'</div>'
+    }
+    default: return `<div class="ast-node">${i}Unknown: ${node.t}</div>`
+  }
+}
+
+function renderDataTab() {
+  const out = document.getElementById('data-output')
+  const formula = sf.value.trim()
+  const data = {}
+  for (const ref of cdRefs) {
+    if (sandData[ref] !== undefined) {
+      const v = sandData[ref]; const n = parseFloat(v)
+      data[ref] = isNaN(n) || v === '' ? v : n
+    }
+  }
+  let lines = []
+  for (const ref of cdRefs) {
+    const raw = sandData[ref]
+    const ev = data[ref]
+    lines.push(`${ref} = ${JSON.stringify(raw)}  →  ${JSON.stringify(ev)}`)
+  }
+  if (!formula) {
+    lines.push('')
+    lines.push('(Type a formula above)')
+  } else {
+    try { const r = run(formula, data); lines.push(''); lines.push(`Result: ${JSON.stringify(r)}`) } catch(e) { lines.push(''); lines.push(`Error: ${e.message}`) }
+  }
+  out.textContent = lines.join('\n')
+}
+
+sf.addEventListener('input', evaluateSand)
+evaluateSand()
+
+// ===== BUILDER =====
+function buildFnGrid(filter='') {
+  const grid = document.getElementById('fn-grid')
+  const upper = filter.toUpperCase()
+  const fns = FN_META.filter(f => !upper || f.name.includes(upper) || f.desc.toUpperCase().includes(upper) || f.cat.includes(upper))
+  grid.innerHTML = fns.map(f => `<div class="fn-card" data-fn="${f.name}">
+    <div><span class="fn-name">${f.name}</span> <span class="badge badge-${f.cat}">${f.cat}</span></div>
+    <div class="fn-sig">${esc(f.sig)}</div>
+    <div class="fn-desc">${esc(f.desc)}</div>
+  </div>`).join('')
+  grid.querySelectorAll('.fn-card').forEach(el => {
+    el.addEventListener('click', () => insertFn(el.dataset.fn))
+  })
+}
+
+document.getElementById('fn-search').addEventListener('input', e => buildFnGrid(e.target.value))
+
+function insertFn(name) {
+  const meta = FN_META.find(f => f.name === name)
+  const args = meta.sig.replace(/\[.*?\]/g,'').replace(/\(\)/,'')
+  const hasArgs = args.trim().length > 0 && !args.startsWith('(')
+  const snippet = name + '('
+  const textarea = sf
+  const start = textarea.selectionStart
+  const end = textarea.selectionEnd
+  const before = textarea.value.substring(0, start)
+  const after = textarea.value.substring(end)
+  textarea.value = before + snippet + (hasArgs ? '' : '') + after
+  const pos = start + snippet.length
+  textarea.setSelectionRange(pos, pos)
+  textarea.focus()
+  evaluateSand()
+}
+
+buildFnGrid()
+
+// ===== SANDBOX TABS =====
+document.querySelectorAll('#tab-builder .tab').forEach(t => {}) // builder is in sand-right
+document.querySelectorAll('.sand-right .tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    tab.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
+    tab.parentElement.parentElement.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'))
+    tab.classList.add('active')
+    document.getElementById('tab-'+tab.dataset.tab).classList.add('active')
+  })
+})
+
+// ===== GRID =====
+const ROWS=12,COLS=8
+const colL=Array.from({length:COLS},(_,i)=>String.fromCharCode(65+i))
+let gData={}, gSel='A1', gEdit=false
+
+const gtb=document.getElementById('grid')
+const gcr=document.getElementById('g-cell-ref')
+const gf=document.getElementById('g-formula')
+const gr=document.getElementById('g-result')
+
+function buildGrid() {
+  let h='<tr><th></th>'
+  for(let c=0;c<COLS;c++)h+=`<th>${colL[c]}</th>`
+  h+='</tr>'
+  for(let r=1;r<=ROWS;r++){h+=`<tr><th>${r}</th>`;for(let c=0;c<COLS;c++)h+=`<td id="c-${colL[c]+r}" data-r="${colL[c]+r}"></td>`;h+='</tr>'}
+  gtb.innerHTML=h
+  gtb.addEventListener('click',e=>{const td=e.target.closest('td');if(!td||!td.dataset.r)return;gSel=td.dataset.r;updateG()})
+  gtb.addEventListener('dblclick',e=>{const td=e.target.closest('td');if(!td||!td.dataset.r)return;gSel=td.dataset.r;updateG();startGEdit()})
+  document.addEventListener('keydown',e=>{
+    if(gEdit)return
+    const m=gSel.match(/^([A-Z]+)(\d+)$/);if(!m)return
+    let c=colL.indexOf(m[1]),r=parseInt(m[2]),k=e.key,handled=true
+    if(k==='ArrowUp')r=Math.max(1,r-1);else if(k==='ArrowDown')r=Math.min(ROWS,r+1);else if(k==='ArrowLeft')c=Math.max(0,c-1);else if(k==='ArrowRight')c=Math.min(COLS-1,c+1);else if(k==='Enter'||k==='Tab'){startGEdit();return}
+    else if(k==='Delete'||k==='Backspace'){delete gData[gSel];renderG();updateG();return}else handled=false
+    if(handled){e.preventDefault();gSel=colL[c]+r;updateG();renderG();return}
+    if(k.length===1&&!e.ctrlKey&&!e.metaKey){startGEdit();const inp=document.querySelector('#c-'+gSel+' input');if(inp){inp.value=k;inp.setSelectionRange(1,1)}}
+  })
+}
+
+function startGEdit(){
+  const td=document.getElementById('c-'+gSel);if(!td)return
+  gEdit=true;const raw=gData[gSel]||'',val=raw?('='+raw):''
+  td.innerHTML=`<input type="text" value="${esc(val)}" style="width:100%;height:100%;border:none;outline:none;font-size:13px;text-align:right;padding:4px 8px;font-family:monospace;background:#fff" spellcheck="false">`
+  const inp=td.querySelector('input');inp.focus();inp.select()
+  inp.addEventListener('blur',()=>commitGEdit());inp.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();inp.blur()}if(e.key==='Escape'){e.preventDefault();cancelGEdit()}})
+}
+
+function commitGEdit(){
+  if(!gEdit)return;gEdit=false
+  const inp=document.querySelector('#c-'+gSel+' input');if(!inp)return
+  let raw=inp.value.trim()
+  if(!raw)delete gData[gSel]
+  else if(raw.startsWith('='))gData[gSel]=raw.slice(1)
+  else gData[gSel]=raw
+  renderG();updateG()
+}
+
+function cancelGEdit(){gEdit=false;renderG();updateG()}
+
+function renderG(){
+  for(let r=1;r<=ROWS;r++)for(let c=0;c<COLS;c++){
+    const ref=colL[c]+r,td=document.getElementById('c-'+ref)
+    if(!td||(gEdit&&ref===gSel))continue
+    const raw=gData[ref]
+    if(raw!==undefined){
+      try{const res=run(raw,gData);td.textContent=typeof res==='number'&&!Number.isInteger(res)?res.toFixed(4):String(res);td.className='formula-cell'}catch(e){td.textContent='#ERROR';td.className='error-cell'}
+    }else{td.textContent='';td.className=''}
+  }
+}
+
+function updateG(){
+  gcr.textContent=gSel
+  document.querySelectorAll('td.selected').forEach(t=>t.classList.remove('selected'))
+  const td=document.getElementById('c-'+gSel);if(td)td.classList.add('selected')
+  const raw=gData[gSel]
+  gf.value=raw!==undefined?('='+raw):''
+  if(raw!==undefined){try{const res=run(raw,gData);gr.textContent=typeof res==='number'&&!Number.isInteger(res)?res.toFixed(4):String(res);gr.className=''}catch(e){gr.textContent=e.message;gr.className='error'}}else{gr.textContent='';gr.className=''}
+}
+
+gf.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const v=gf.value.trim();if(!v)delete gData[gSel];else if(v.startsWith('='))gData[gSel]=v.slice(1);else gData[gSel]=v;renderG();updateG()}
+  if(e.key==='Escape')gf.blur()
+})
+
+// Seed grid
+{gData.A1='10';gData.A2='20';gData.A3='30';gData.A4='40';gData.A5='50';gData.B1='5';gData.B2='15';gData.B3='25';gData.C1='hello';gData.C2='world';gData.D1='SUM(A1:A5)';gData.D2='AVG(A1:A5)';gData.D4='IF(D1>100,"high","low")';gData.D5='CONCAT(UPPER(C1)," ",C2)';gData.E1='MAX(A1:A5)';gData.E2='MIN(A1:A5)';gData.E3='ROUND(PI(),3)';gData.F1='COUNT(A1:A5)';gData.F2='A1+B1*POWER(2,3)';gData.F3='IF(SUM(A1:A3)>50,"pass","fail")'}
+buildGrid();renderG();updateG()
+
+// ===== MAIN TABS =====
+document.querySelectorAll('.tab-main').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab-main').forEach(t=>t.classList.remove('active'))
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'))
+    tab.classList.add('active')
+    document.getElementById('view-'+tab.dataset.view).classList.add('active')
+  })
+})
+
+// Auto-resize sandbox textarea
+sf.addEventListener('input', () => {
+  sf.style.height = 'auto'
+  sf.style.height = sf.scrollHeight + 'px'
+  evaluateSand()
+})
+</script>
+</body>
+</html>
